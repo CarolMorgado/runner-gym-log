@@ -2,7 +2,7 @@
 
 A mobile-first web app for following and logging a 4-week strength program for amateur runners. It works like a phone app from the home screen: tap through each session, log weights, tick off exercises, run rest timers, track body weight and send workouts to Strava.
 
-**Live demo:** `(https://carolmorgado.github.io/runner-gym-log/)`
+**Live demo:** `https://carolmorgado.github.io/runner-gym-log/`
 
 ---
 
