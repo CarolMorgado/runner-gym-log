@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Runner Gym Log</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Gym Log">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-column phone logbook — sticky week/day picker on top, exercise cards stacked, rest timer docked at the bottom. */
+:root{
+  --bg:#f2f5f4; --surface:#ffffff; --ink:#14201e; --muted:#5d6d69; --line:#d9e1df;
+  --accent:#0d7a6f; --accent-ink:#ffffff; --accent-soft:#dcefec; --done:#2f8f46; --done-soft:#e3f3e6;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1312; --surface:#151d1c; --ink:#e7eeec; --muted:#93a39f; --line:#26322f;
+  --accent:#3cc7b4; --accent-ink:#06201c; --accent-soft:#16312d; --done:#5fcf76; --done-soft:#17301d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1312; --surface:#151d1c; --ink:#e7eeec; --muted:#93a39f; --line:#26322f;
+  --accent:#3cc7b4; --accent-ink:#06201c; --accent-soft:#16312d; --done:#5fcf76; --done-soft:#17301d; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.4}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 120px}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:10px 10px;display:grid;gap:10px;border-bottom:1px solid var(--line)}
+.titlerow{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+h1{font-family:var(--display);font-weight:700;font-size:28px;letter-spacing:.02em;text-transform:uppercase;margin:0}
+.cycle{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1 0 auto;min-width:56px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 10px;font:600 15px var(--body);cursor:pointer}
+.tab small{display:block;font-weight:500;font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.tab[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tab[aria-pressed="true"] small{color:var(--accent-ink);opacity:.8}
+.tab:focus-visible,.btn:focus-visible,button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dayhead{display:flex;justify-content:space-between;align-items:end;gap:12px;margin:18px 0 6px}
+.dayhead h2{font-family:var(--display);font-size:24px;margin:0;line-height:1.1;text-wrap:balance}
+.dayhead p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.prog{font-family:var(--display);font-size:22px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-bottom:14px}
+.bar i{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+details.warm{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:12px}
+details.warm summary{cursor:pointer;font-weight:600}
+details.warm ul{margin:8px 0 2px;padding-left:18px;color:var(--muted);font-size:14px}
+details.warm li{margin:3px 0}
+details.warm a{color:var(--accent)}
+.list{display:grid;gap:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:8px}
+.card.isdone{background:var(--done-soft);border-color:transparent}
+.row1{display:flex;gap:10px;align-items:flex-start}
+.blk{font:700 12px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);border-radius:6px;padding:3px 7px;white-space:nowrap;margin-top:2px}
+.name{flex:1;min-width:0}
+.name b{display:block;font-size:17px;line-height:1.25}
+.meta{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:14px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+.meta strong{color:var(--ink);font-weight:600}
+.check{width:40px;height:40px;flex:none;border-radius:50%;border:2px solid var(--line);background:transparent;color:transparent;cursor:pointer;display:grid;place-items:center;font-size:20px}
+.card.isdone .check{background:var(--done);border-color:var(--done);color:#fff}
+.how{font-size:14px;color:var(--muted);margin:0}
+.row2{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.kg{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.kg button{width:38px;height:40px;border:0;background:transparent;color:var(--ink);font-size:20px;cursor:pointer}
+.kg input{width:62px;height:40px;border:0;background:transparent;color:var(--ink);text-align:center;font:600 17px var(--body);font-variant-numeric:tabular-nums}
+.kg span{font-size:13px;color:var(--muted);padding-right:8px}
+.last{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.spacer{flex:1}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;height:40px;padding:0 12px;font:600 14px var(--body);cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.foot{margin-top:18px;display:grid;gap:10px}
+.note{font-size:13px;color:var(--muted)}
+/* body weight */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:12px}
+.bwform{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.bwform input{height:40px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);padding:0 10px;font:600 16px var(--body);font-variant-numeric:tabular-nums}
+.bwform input[type=number]{width:100px}
+.bwlist{list-style:none;margin:0;padding:0;display:grid}
+.bwlist li{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.bwlist button{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:13px}
+.chart{width:100%;height:auto;display:block}
+.empty{color:var(--muted);font-size:14px;margin:0}
+/* rest timer */
+.timer{position:fixed;left:0;right:0;bottom:0;z-index:8;background:var(--ink);color:var(--bg);padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;align-items:center;gap:12px}
+.timer .t{font-family:var(--display);font-size:34px;font-variant-numeric:tabular-nums;min-width:80px}
+.timer .lbl{flex:1;font-size:14px;opacity:.8}
+.timer button{border:1px solid currentColor;background:transparent;color:inherit;border-radius:10px;height:40px;padding:0 12px;font:600 14px var(--body);cursor:pointer}
+.timer.over{background:var(--done);color:#fff}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:10px;font-size:14px;z-index:9}
+.strava{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px}
+.strava h3{font-family:var(--display);font-size:20px;margin:0;text-transform:uppercase;letter-spacing:.03em}
+.strava .fields{display:flex;flex-wrap:wrap;gap:8px}
+.strava label{display:grid;gap:4px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.strava input{height:40px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);padding:0 10px;font:600 15px var(--body);font-variant-numeric:tabular-nums}
+.strava input[type=number]{width:90px}
+.strava .acts{display:flex;flex-wrap:wrap;gap:8px}
+.strava ol{margin:0;padding-left:18px;font-size:13px;color:var(--muted)}
+.strava ol li{margin:2px 0}
+.strava a{color:var(--accent)}
+.strava textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);padding:8px;font:13px var(--body)}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="titlerow"><h1>Gym Log</h1><span class="cycle" id="cycleLbl">Cycle 1</span></div>
+    <div class="tabs" id="weekTabs" role="group" aria-label="Week"></div>
+    <div class="tabs" id="dayTabs" role="group" aria-label="Session"></div>
+  </header>
+  <main id="main"></main>
+</div>
+<div class="timer" id="timer" hidden>
+  <span class="t" id="timerT">0:60</span><span class="lbl" id="timerLbl">Rest</span>
+  <button id="timerAdd" type="button">+15 s</button><button id="timerStop" type="button">Done</button>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const YT = q => "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
+// [block, name, youtube query, sets × reps, rest, how]
+const PLAN = {
+ 1:{
+  A:{t:"Legs, tendons & speed",m:65,ex:[
+   ["Plyo","Pogo hops","pogo hops runners","3 × 20 s","40 s","Straight knees, bounce off the balls of the feet, minimal ground contact"],
+   ["Tendon","Isometric calf raise hold","isometric calf raise hold achilles","3 × 30 s","30 s","Rise halfway on toes, hold still, push hard into the floor"],
+   ["A1","Goblet squat","goblet squat form","3 × 12","—","Dumbbell at chest, chest up, knees over toes, hips below knees"],
+   ["A2","Glute bridge","glute bridge form","3 × 12","60 s","Drive through heels, squeeze glutes 1 s at top, ribs down"],
+   ["B1","Dumbbell Romanian deadlift","dumbbell romanian deadlift form","3 × 10","—","Soft knees, push hips back, flat back, feel the hamstring stretch"],
+   ["B2","Reverse lunge","reverse lunge form","3 × 10 / leg","60 s","Step back, both knees to 90°, push up through the front heel"],
+   ["C1","Standing calf raise (slow)","standing calf raise form","3 × 15","—","Full range on a step, 1 s up, 3 s down"],
+   ["C2","Bent-knee calf raise","bent knee calf raise soleus","3 × 15","45 s","Knees bent ~45° to target the soleus"],
+   ["Core","Dead bug + side plank","dead bug exercise form","3 × 10 / side + 30 s / side","30 s","Lower back glued to the floor; side plank in one straight line"]]},
+  B:{t:"Back, chest & core",m:60,ex:[
+   ["A1","Dumbbell bench press","dumbbell bench press form","3 × 10","—","Shoulder blades back, lower to chest level, press up and slightly in"],
+   ["A2","Seated cable row","seated cable row form","3 × 12","60 s","Tall spine, elbows back past ribs, pause 1 s"],
+   ["B1","Push-up","push up proper form","3 × max − 2","—","Body in one line, elbows ~45°, chest close to the floor"],
+   ["B2","Lat pulldown","lat pulldown form","3 × 12","60 s","Bar to upper chest, elbows down and back, no swinging"],
+   ["C1","Single-arm dumbbell row","single arm dumbbell row form","3 × 10 / side","—","Hand and knee on bench, dumbbell to hip, no twisting"],
+   ["C2","Face pull","face pull form","3 × 15","45 s","Rope to forehead, elbows high, squeeze rear shoulders"],
+   ["Core","Shoulder taps · bird dog · Pallof press","pallof press form","3 rounds: 20 · 10/side · 10/side","20 s","Hips still on taps; bird dog slow; resist the cable on Pallof"]]},
+  C:{t:"Stability & power",m:60,ex:[
+   ["Plyo","Low box jump","box jump form beginner","3 × 5","60 s","Swing arms, land softly in a quarter squat, step down"],
+   ["Plyo","Skater hops","skater hops exercise","3 × 6 / side","45 s","Jump sideways onto one leg, stick the landing 1 s"],
+   ["Circuit","Single-leg Romanian deadlift","single leg romanian deadlift form","3 rounds × 8 / leg","20 s","Hips square, back leg and torso move as one line"],
+   ["Circuit","Dumbbell step-up","dumbbell step up form","3 rounds × 10 / leg","20 s","Knee-height box, push through the top foot only"],
+   ["Circuit","Copenhagen plank (short lever)","copenhagen plank short lever","3 rounds × 20 s / side","20 s","Top knee on bench, lift hips"],
+   ["Circuit","Single-leg balance on cushion","single leg balance exercise runners","3 rounds × 30 s / leg","20 s","Slight knee bend, hips level"],
+   ["Circuit","Farmer carry","farmer carry form","3 rounds × 30 m","90 s","Heavy dumbbells, tall posture, short quick steps"],
+   ["Finisher","Hip airplane","hip airplane exercise","2 × 5 / leg","30 s","On one leg, rotate pelvis open and closed slowly"]]}},
+ 2:{
+  A:{t:"Legs, tendons & speed",m:70,ex:[
+   ["Plyo","Ankle hops forward/back","ankle hops runners plyometric","3 × 20 s","40 s","Quick, stiff ankles, hop over a line"],
+   ["Tendon","Isometric split squat hold","isometric split squat hold","3 × 30 s / side","30 s","Bottom of a lunge, front knee ~90°, hold steady"],
+   ["A1","Bulgarian split squat","bulgarian split squat form","4 × 8 / leg","—","Rear foot on bench, drop straight down, front heel down"],
+   ["A2","Barbell hip thrust","barbell hip thrust form","4 × 10","60 s","Upper back on bench, chin tucked, full lock-out"],
+   ["B1","Trap bar deadlift","trap bar deadlift form","4 × 8","—","Push the floor away, neutral back, stand tall"],
+   ["B2","Assisted Nordic hamstring curl","assisted nordic hamstring curl band","3 × 5","60 s","Feet anchored, lower as slowly as possible"],
+   ["C1","Single-leg calf raise","single leg calf raise form","3 × 12 / leg","—","On a step, full range, 3 s down"],
+   ["C2","Tibialis raise","tibialis raise shin splints","3 × 15","45 s","Back against wall, lift toes toward shins"],
+   ["Core","Hanging knee raise + suitcase carry","hanging knee raise form","3 × 12 + 30 m / side","30 s","No swinging; one heavy dumbbell, don't lean"]]},
+  B:{t:"Back, chest & core",m:65,ex:[
+   ["A1","Barbell bench press","barbell bench press form","4 × 8","—","Feet planted, slight arch, bar to lower chest"],
+   ["A2","Bent-over barbell row","bent over barbell row form","4 × 8","60 s","Hinge to ~45°, flat back, bar to belly button"],
+   ["B1","Pull-up (assisted)","assisted pull up form","4 × 6–8","—","Full hang to chin over bar; band or machine help"],
+   ["B2","Incline dumbbell press","incline dumbbell press form","4 × 10","60 s","Bench 30–45°, press over upper chest"],
+   ["C1","Chest-supported dumbbell row","chest supported dumbbell row","3 × 12","—","Face down on incline bench, row both dumbbells"],
+   ["C2","Band pull-apart","band pull apart form","3 × 20","45 s","Straight arms, band to chest, squeeze shoulder blades"],
+   ["Core","Renegade row · side plank reach · hollow hold","renegade row form","3 rounds: 8/side · 8/side · 25 s","20 s","Wide feet, hips square; lower back pressed down"]]},
+  C:{t:"Stability & power",m:65,ex:[
+   ["Plyo","Box jump","box jump form","4 × 5","60 s","Slightly higher box than Week 1, land quietly"],
+   ["Plyo","Single-leg pogo hops","single leg pogo hops","3 × 10 / leg","45 s","Small fast hops, knee almost straight"],
+   ["Circuit","Lateral lunge","lateral lunge form","4 rounds × 8 / side","20 s","Sit back into one hip, other leg straight"],
+   ["Circuit","Single-leg glute bridge","single leg glute bridge form","4 rounds × 12 / leg","20 s","Hips stay level"],
+   ["Circuit","Kettlebell swing","kettlebell swing form","4 rounds × 15","20 s","Hinge, snap hips, bell floats to chest height"],
+   ["Circuit","Lateral band walk","lateral band walk form","4 rounds × 15 / side","20 s","Band above knees, quarter squat"],
+   ["Circuit","Single-leg balance with reach","single leg balance reach star excursion","4 rounds × 6 / leg","20 s","Reach forward, side, back without touching down"],
+   ["Circuit","Copenhagen plank","copenhagen plank","4 rounds × 25 s / side","90 s","Short lever, or long lever if easy"]]}},
+ 3:{
+  A:{t:"Legs, tendons & speed",m:75,ex:[
+   ["Plyo","Drop landing (low box)","drop landing exercise stick landing","3 × 5","45 s","Step off 20–30 cm box, land and freeze, knees out"],
+   ["Plyo","Broad jump","broad jump form","4 × 4","60 s","Swing arms, jump far, stick the landing"],
+   ["A1","Barbell back squat","barbell back squat form","4 × 6","—","Brace core, sit between hips, drive up fast"],
+   ["A2","Single-leg hip thrust","single leg hip thrust","4 × 8 / leg","90 s","Upper back on bench, full lock-out"],
+   ["B1","Barbell Romanian deadlift","barbell romanian deadlift form","4 × 6","—","Bar close to legs, hips back"],
+   ["B2","Dumbbell walking lunge","dumbbell walking lunge form","3 × 10 / leg","75 s","Long steps, upright torso"],
+   ["C1","Heavy Smith calf raise","smith machine calf raise","4 × 8","—","Heavy, on a plate, 3 s down"],
+   ["C2","Heavy isometric calf hold","heavy isometric calf raise smith machine","3 × 30 s","45 s","Same machine, hold mid-range"],
+   ["Core","Ab wheel + Pallof step-out","ab wheel rollout form","3 × 8 + 3 × 10 / side","30 s","Rollout from knees, hips don't sag"]]},
+  B:{t:"Back, chest & core",m:65,ex:[
+   ["A1","Heavy dumbbell bench press","dumbbell bench press form","4 × 6","—","Heavier than Week 1, 2 s down"],
+   ["A2","Weighted pull-up / heavy pulldown","weighted pull up form","4 × 6","90 s","Dip belt or dumbbell between feet"],
+   ["B1","Single-arm landmine press","single arm landmine press","3 × 8 / side","—","Staggered stance, press up and forward"],
+   ["B2","Single-arm cable row","single arm cable row","3 × 10 / side","60 s","Reach long, pull to hip"],
+   ["C1","Medicine ball chest pass","medicine ball chest pass wall","3 × 8","—","Explosive throw into a wall"],
+   ["C2","Medicine ball slam","medicine ball slam form","3 × 10","45 s","Full reach overhead, slam with whole body"],
+   ["Core","Weighted dead bug · stir the pot · hip dips","stir the pot exercise","3 rounds: 10/side · 8/dir · 12/side","20 s","Light plate overhead; forearms on Swiss ball"]]},
+  C:{t:"Stability & power",m:65,ex:[
+   ["Plyo","Lateral bound and stick","lateral bound stick landing","3 × 5 / side","45 s","Big jumps, hold landing 2 s"],
+   ["Plyo","A-skips for height","a skip running drill","3 × 20 m","walk back","Drive knee up, punchy foot strike"],
+   ["Circuit","Single-leg RDL to knee drive","single leg rdl to knee drive","4 rounds × 40 s","20 s","Hinge down, drive back knee up like a stride"],
+   ["Circuit","Weighted step-up with knee drive","step up knee drive","4 rounds × 40 s","20 s","Dumbbells in hands, knee to hip height"],
+   ["Circuit","Goblet lateral lunge","goblet lateral lunge","4 rounds × 40 s","20 s","Alternate sides"],
+   ["Circuit","Single-leg box squat","single leg box squat","4 rounds × 40 s","20 s","Sit to a bench on one leg"],
+   ["Circuit","Copenhagen plank (long lever)","copenhagen plank long lever","4 rounds × 20 s / side","20 s","Foot on bench, body straight"],
+   ["Circuit","Heavy farmer carry","farmer carry form","4 rounds × 40 s","90 s","Heaviest dumbbells with good posture"]]}},
+ 4:{
+  A:{t:"Legs, tendons & speed",m:55,ex:[
+   ["Plyo","Pogo hops","pogo hops runners","3 × 20 s","40 s","Faster and higher than Week 1"],
+   ["Plyo","Split squat jump","split squat jump form","3 × 6 / side","60 s","Explode up, switch legs, land soft"],
+   ["A1","Jump squat","jump squat form","3 × 6","—","Bodyweight or light dumbbells, max height"],
+   ["A2","Tempo goblet squat","tempo goblet squat","3 × 10","60 s","Light, 3 s down, 1 s pause, fast up"],
+   ["B1","Kettlebell swing","kettlebell swing form","3 × 15","—","Sharp hip snap"],
+   ["B2","Reverse lunge","reverse lunge form","3 × 10 / leg","45 s","Bodyweight, quick but controlled"],
+   ["C1","Single-leg calf raise","single leg calf raise form","3 × 15 / leg","—","Bodyweight, full range"],
+   ["C2","Tibialis raise","tibialis raise shin splints","3 × 15","30 s","Back against wall, toes to shins"],
+   ["Core","Bird dog + side plank","bird dog exercise form","2 × 10 / side + 40 s / side","30 s","Slow and controlled"]]},
+  B:{t:"Upper-body circuit",m:45,ex:[
+   ["Circuit","Push-up","push up proper form","4 rounds × 12","15 s","Fast up, controlled down"],
+   ["Circuit","Inverted row","inverted row form","4 rounds × 10","15 s","Under a bar, body straight, chest to bar"],
+   ["Circuit","Dumbbell push press","dumbbell push press form","4 rounds × 10","15 s","Small knee dip, drive dumbbells overhead"],
+   ["Circuit","Band pull-apart","band pull apart form","4 rounds × 20","15 s","Straight arms, squeeze shoulder blades"],
+   ["Circuit","Medicine ball slam","medicine ball slam form","4 rounds × 10","15 s","Full body, explosive"],
+   ["Circuit","Plank","plank proper form","4 rounds × 40 s","90 s","Squeeze glutes, ribs down"]]},
+  C:{t:"Stability, power & mobility",m:60,ex:[
+   ["Plyo","Skater hops","skater hops exercise","3 × 8 / side","45 s","Quick rhythm, short stick"],
+   ["Plyo","Box jump","box jump form","3 × 4","60 s","Maximal intent, step down"],
+   ["Circuit","Bodyweight single-leg RDL","single leg romanian deadlift form","3 rounds × 10 / leg","20 s","Slow, perfect balance"],
+   ["Circuit","Step-up","dumbbell step up form","3 rounds × 10 / leg","20 s","Bodyweight, fast up"],
+   ["Circuit","Lateral band walk","lateral band walk form","3 rounds × 15 / side","20 s","Stay low"],
+   ["Circuit","Single-leg balance, eyes closed","single leg balance eyes closed","3 rounds × 20 s / leg","20 s","Near a wall for safety"],
+   ["Circuit","Copenhagen plank","copenhagen plank","3 rounds × 20 s / side","20 s","Short lever"],
+   ["Circuit","Bear crawl","bear crawl form","3 rounds × 20 m","90 s","Knees just off the floor"],
+   ["Mobility","Full cool-down flow","couch stretch","2 rounds · 15 min","—","Every stretch in the cool-down list"]]}}
+};
+const DAY_D = {t:"Optional: mobility, core & feet",m:35,ex:[
+  ["Feet","Short foot / foot doming","short foot exercise runners","3 × 10 / foot","20 s","Pull the arch up without curling toes"],
+  ["Calf","Single-leg calf raise","single leg calf raise form","3 × 15 / leg","30 s","Slow, full range"],
+  ["Hips","Hip airplane","hip airplane exercise","3 × 5 / leg","30 s","Hold support if needed"],
+  ["Core","Dead bug · side plank · bird dog","dead bug exercise form","3 rounds: 10 · 30 s · 10 / side","15 s","Circuit"],
+  ["Mobility","Full cool-down flow","couch stretch","2 rounds","—","Every stretch in the cool-down list"]]};
+const WARM = [["Bike, rower or rope · 4 min",null],["Leg swings · 10 each / leg","leg swings runners warm up"],["World's greatest stretch · 5 / side","worlds greatest stretch"],["Cat-cow · 8","cat cow stretch"],["Ankle knee-to-wall · 10 / side","knee to wall ankle mobility"],["Band walk + clamshell · 10 / side","clamshell band exercise"],["Inchworm · 5","inchworm exercise"]];
+const COOL = [["Couch stretch · 45 s / side","couch stretch"],["90/90 hip switch · 8","90 90 hip mobility"],["Pigeon stretch · 45 s / side","pigeon stretch"],["Calf + soleus wall stretch · 30 s each","calf soleus stretch wall"],["Open book · 8 / side","open book thoracic stretch"],["Child's pose lat reach · 45 s","childs pose lat stretch"]];
+
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+const $ = id => document.getElementById(id);
+const ls = {get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+// ---------- state ----------
+let view = ls.get("gl.view",{week:1,day:"A"});
+if(view.day!=="BW" && !["A","B","C","D"].includes(view.day)) view.day="A";
+let logs = ls.get("gl.logs",{});      // sessionId -> {cycle,week,day,updated,ex:{slug:{kg,done}}}
+let body = ls.get("gl.body",{});      // date -> {date,kg}
+let cycle = ls.get("gl.cycle",1);
+let db = null;
+
+const sid = () => `c${cycle}-w${view.week}-${view.day}`;
+function session(){ return logs[sid()] || {cycle,week:view.week,day:view.day,ex:{}}; }
+
+// ---------- writes (one at a time per doc, debounced) ----------
+const timers={}, chains={};
+function queueWrite(id){
+  ls.set("gl.logs",logs);
+  clearTimeout(timers[id]);
+  timers[id]=setTimeout(()=>{
+    if(!db) return;
+    const body={...logs[id]};
+    chains[id]=(chains[id]||Promise.resolve()).then(()=>db.collection("logs").doc(id).set(body)).catch(err);
+  },700);
+}
+function err(e){ if(e&&e.code==="quota_exceeded") toast("Storage is full — delete old body-weight entries"); else if(e&&e.code!=="revoked") toast("Couldn't save — check your connection"); }
+function setEx(key,patch){
+  const id=sid(); const s=session();
+  const ex={...s.ex}; ex[key]={...(ex[key]||{}),...patch};
+  const now=new Date().toISOString();
+  logs[id]={cycle,week:view.week,day:view.day,started:s.started||now,updated:now,ex};
+  queueWrite(id);
+}
+
+// ---------- render ----------
+function tabs(){
+  $("weekTabs").innerHTML=[1,2,3,4].map(w=>`<button class="tab" type="button" data-w="${w}" aria-pressed="${view.week===w&&view.day!=="BW"}"><small>Week</small>${w}</button>`).join("");
+  const days=[["A","Legs"],["B","Upper"],["C","Stability"],["D","Extra"],["BW","Body kg"]];
+  $("dayTabs").innerHTML=days.map(([d,l])=>`<button class="tab" type="button" data-d="${d}" aria-pressed="${view.day===d}"><small>${l}</small>${d==="BW"?"⚖":"Day "+d}</button>`).join("");
+  $("cycleLbl").textContent=`Cycle ${cycle}`;
+}
+function lastKg(key){
+  let best=null;
+  for(const [id,s] of Object.entries(logs)){
+    if(id===sid()||!s.ex||!s.ex[key]||s.ex[key].kg==null||s.ex[key].kg==="") continue;
+    if(!best||String(s.updated)>String(best.updated)) best={kg:s.ex[key].kg,updated:s.updated};
+  }
+  return best;
+}
+function render(){
+  tabs();
+  if(view.day==="BW") return renderBody();
+  const d = view.day==="D"?DAY_D:PLAN[view.week][view.day];
+  const warmList = a => a.map(([t,q])=>`<li>${q?`<a href="${YT(q)}" target="_blank" rel="noopener">${t}</a>`:t}</li>`).join("");
+  $("main").innerHTML=`
+   <div class="dayhead"><div><h2>Week ${view.week} · ${view.day==="D"?"Day D":"Day "+view.day}</h2><p>${d.t} · ~${d.m} min</p></div><div class="prog" id="prog">0/${d.ex.length}</div></div>
+   <div class="bar"><i id="barFill"></i></div>
+   <details class="warm"><summary>Warm-up · 10 min</summary><ul>${warmList(WARM)}</ul></details>
+   <div class="list">${d.ex.map((e,i)=>{const key=slug(e[1]);const rest=parseInt(e[4]);return `
+    <article class="card" data-key="${key}">
+     <div class="row1">
+      <span class="blk">${e[0]}</span>
+      <div class="name"><b>${e[1]}</b><div class="meta"><span><strong>${e[3]}</strong></span><span>Rest ${e[4]}</span></div></div>
+      <button class="check" type="button" data-act="done" aria-label="Mark ${e[1]} done">✓</button>
+     </div>
+     <p class="how">${e[5]}</p>
+     <div class="row2">
+      <div class="kg"><button type="button" data-act="dec" aria-label="Less weight">−</button><input id="kg-${key}-${i}" inputmode="decimal" placeholder="—" aria-label="Weight in kg for ${e[1]}"><span>kg</span><button type="button" data-act="inc" aria-label="More weight">+</button></div>
+      <span class="last" data-last></span>
+      <span class="spacer"></span>
+      ${rest?`<button class="btn" type="button" data-act="rest" data-rest="${rest}">⏱ ${rest}s</button>`:""}
+      <a class="btn" href="${YT(e[2])}" target="_blank" rel="noopener">▶ Video</a>
+     </div>
+    </article>`}).join("")}</div>
+   <details class="warm" style="margin-top:12px"><summary>Cool-down · 5 min</summary><ul>${warmList(COOL)}</ul></details>
+   <div class="foot">
+    <section class="strava" aria-labelledby="stravaH">
+     <h3 id="stravaH">Log to Strava</h3>
+     <div class="fields">
+      <label for="svStart">Start<input type="datetime-local" id="svStart"></label>
+      <label for="svDur">Minutes<input type="number" id="svDur" min="1" max="300" inputmode="numeric"></label>
+     </div>
+     <div class="acts">
+      <button class="btn primary" type="button" id="svCopy">Copy workout for Strava</button>
+      ${STANDALONE?`<button class="btn" type="button" id="svFit">Download .fit file</button>`:""}
+     </div>
+     <textarea id="svText" readonly aria-label="Workout summary" hidden></textarea>
+     <ol>
+      <li>In the Strava app tap <strong>+</strong> → <strong>Add manual activity</strong>.</li>
+      <li>Sport: <strong>Weight Training</strong>. Set the start time and duration shown above.</li>
+      <li>Paste the copied text into the description and save.</li>
+      ${STANDALONE?`<li>Or upload the .fit file at <a href="https://www.strava.com/upload/select" target="_blank" rel="noopener">strava.com/upload/select</a> in a browser. It arrives as Weight Training with the time already set.</li>`:""}
+     </ol>
+    </section>
+    ${view.week===4?`<button class="btn primary" type="button" id="nextCycle">Finished Week 4 — start cycle ${cycle+1}</button><p class="note">Starts Week 1 again with fresh logs. Your old weights show as “Last” so you can go heavier.</p>`:""}
+    <p class="note">${db?"Saved to your account — open this page on any device.":"Saved on this device."}</p></div>`;
+  refresh();
+}
+function refresh(){
+  if(view.day==="BW") return;
+  const s=session(); let done=0, cards=document.querySelectorAll(".card");
+  cards.forEach(c=>{
+    const k=c.dataset.key, v=s.ex[k]||{};
+    c.classList.toggle("isdone",!!v.done); if(v.done) done++;
+    const inp=c.querySelector("input");
+    if(document.activeElement!==inp) inp.value=v.kg??"";
+    const l=lastKg(k); c.querySelector("[data-last]").textContent=l?`Last ${l.kg} kg`:"";
+  });
+  fillStrava();
+  $("prog").textContent=`${done}/${cards.length}`;
+  $("barFill").style.width=(cards.length?done/cards.length*100:0)+"%";
+}
+function renderBody(){
+  const rows=Object.values(body).sort((a,b)=>b.date.localeCompare(a.date));
+  const today=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  $("main").innerHTML=`
+   <div class="dayhead"><div><h2>Body weight</h2><p>Log once a week, same time of day.</p></div></div>
+   <section class="panel">
+    <form class="bwform" id="bwForm"><input type="date" id="bwDate" value="${today}" aria-label="Date"><input type="number" id="bwKg" step="0.1" min="20" max="250" inputmode="decimal" placeholder="kg" aria-label="Body weight in kg" required><button class="btn primary" type="submit">Save</button></form>
+    ${rows.length>1?chart(rows.slice().reverse()):""}
+    ${rows.length?`<ul class="bwlist">${rows.map(r=>`<li><span>${fmtDate(r.date)}</span><span><strong>${r.kg} kg</strong> <button type="button" data-del="${r.date}" aria-label="Delete ${r.date}">Delete</button></span></li>`).join("")}</ul>`:`<p class="empty">No entries yet. Add today's weight above.</p>`}
+   </section>`;
+}
+function fmtDate(d){const [y,m,dd]=d.split("-");return new Date(+y,m-1,+dd).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"})}
+function chart(r){
+  const W=600,H=160,P=28; const ks=r.map(x=>+x.kg); let lo=Math.min(...ks),hi=Math.max(...ks); if(hi-lo<1){lo-=.5;hi+=.5}
+  const X=i=>P+i*(W-2*P)/(r.length-1), Y=v=>H-P-(v-lo)/(hi-lo)*(H-2*P);
+  const pts=r.map((x,i)=>`${X(i).toFixed(1)},${Y(+x.kg).toFixed(1)}`).join(" ");
+  const L=r.length-1;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Body weight trend">
+   <line x1="${P}" x2="${W-P}" y1="${Y(hi)}" y2="${Y(hi)}" stroke="var(--line)"/><line x1="${P}" x2="${W-P}" y1="${Y(lo)}" y2="${Y(lo)}" stroke="var(--line)"/>
+   <text x="${P}" y="${Y(hi)-6}" fill="var(--muted)" font-size="12">${hi.toFixed(1)}</text><text x="${P}" y="${Y(lo)+16}" fill="var(--muted)" font-size="12">${lo.toFixed(1)}</text>
+   <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>
+   <circle cx="${X(L)}" cy="${Y(ks[L])}" r="5" fill="var(--accent)"/>
+   <text x="${X(L)-8}" y="${Y(ks[L])-10}" text-anchor="end" fill="var(--ink)" font-size="13" font-weight="600">${ks[L]} kg</text></svg>`;
+}
+
+// ---------- events ----------
+document.addEventListener("click",e=>{
+  const w=e.target.closest("[data-w]"); if(w){view.week=+w.dataset.w; if(view.day==="BW")view.day="A"; ls.set("gl.view",view); render(); scrollTo(0,0); return;}
+  const d=e.target.closest("[data-d]"); if(d){view.day=d.dataset.d; ls.set("gl.view",view); render(); scrollTo(0,0); return;}
+  const del=e.target.closest("[data-del]"); if(del){const k=del.dataset.del; delete body[k]; ls.set("gl.body",body); if(db) db.collection("body").doc(k).delete().catch(err); renderBody(); return;}
+  if(e.target.id==="nextCycle"){
+    if(e.target.dataset.armed!=="1"){e.target.dataset.armed="1";e.target.textContent="Tap again to confirm";return;}
+    cycle+=1; ls.set("gl.cycle",cycle); if(db) db.doc("settings/state").set({cycle}).catch(err);
+    view={week:1,day:"A"}; ls.set("gl.view",view); render(); scrollTo(0,0); toast(`Cycle ${cycle} started`); return;
+  }
+  const a=e.target.closest("[data-act]"); if(!a) return;
+  const card=a.closest(".card"), key=card.dataset.key, inp=card.querySelector("input");
+  const cur=parseFloat(String(inp.value).replace(",","."));
+  if(a.dataset.act==="done"){ setEx(key,{done:!(session().ex[key]||{}).done}); refresh(); }
+  if(a.dataset.act==="inc"||a.dataset.act==="dec"){
+    const base=isNaN(cur)?(lastKg(key)?.kg??0):cur; const step=a.dataset.act==="inc"?2.5:-2.5;
+    const v=Math.max(0,Math.round((+base+step)*10)/10); inp.value=v; setEx(key,{kg:v}); refresh();
+  }
+  if(a.dataset.act==="rest") startTimer(+a.dataset.rest, card.querySelector("b").textContent);
+});
+document.addEventListener("input",e=>{
+  if(!e.target.matches(".kg input")) return;
+  const key=e.target.closest(".card").dataset.key; const v=parseFloat(e.target.value.replace(",","."));
+  setEx(key,{kg:isNaN(v)?null:v});
+});
+document.addEventListener("submit",e=>{
+  if(e.target.id!=="bwForm") return; e.preventDefault();
+  const date=$("bwDate").value, kg=Math.round(parseFloat($("bwKg").value)*10)/10; if(!date||isNaN(kg)) return;
+  body[date]={date,kg}; ls.set("gl.body",body); if(db) db.collection("body").doc(date).set({date,kg}).catch(err);
+  renderBody(); toast("Saved");
+});
+
+// ---------- rest timer ----------
+let tEnd=0,tInt=null,wake=null;
+function startTimer(sec,label){
+  tEnd=Date.now()+sec*1000; $("timerLbl").textContent="Rest · "+label; $("timer").hidden=false; $("timer").classList.remove("over");
+  try{ if(navigator.wakeLock&&!wake) navigator.wakeLock.request("screen").then(w=>{wake=w;w.addEventListener("release",()=>wake=null)}).catch(()=>{}); }catch(e){}
+  clearInterval(tInt); tick(); tInt=setInterval(tick,250);
+}
+function tick(){
+  const left=Math.ceil((tEnd-Date.now())/1000);
+  if(left<=0){ $("timerT").textContent="Go!"; if(!$("timer").classList.contains("over")){$("timer").classList.add("over"); try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}} return; }
+  $("timerT").textContent=`${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}`;
+}
+$("timerAdd").onclick=()=>{ tEnd=Math.max(tEnd,Date.now())+15000; $("timer").classList.remove("over"); };
+$("timerStop").onclick=()=>{ clearInterval(tInt); $("timer").hidden=true; };
+
+// ---------- Strava export ----------
+function curDay(){ return view.day==="D"?DAY_D:PLAN[view.week][view.day]; }
+function toLocalInput(d){ const z=new Date(d.getTime()-d.getTimezoneOffset()*6e4); return z.toISOString().slice(0,16); }
+function fillStrava(){
+  const st=$("svStart"), du=$("svDur"); if(!st||st.dataset.touched||document.activeElement===st||document.activeElement===du) return;
+  const s=session(), m=curDay().m;
+  let start=s.started?new Date(s.started):new Date(Date.now()-m*6e4), mins=m;
+  if(s.started){ const spent=Math.round((Date.now()-start)/6e4); if(spent>=10&&spent<=180) mins=spent; }
+  st.value=toLocalInput(start); du.value=mins;
+}
+function stravaText(){
+  const d=curDay(), s=session();
+  const items=d.ex.map(e=>({e,v:s.ex[slug(e[1])]||{}}));
+  const done=items.filter(x=>x.v.done), use=done.length?done:items;
+  const lines=use.map(({e,v})=>`${v.done?"✓":"•"} ${e[1]} — ${e[3]}${v.kg!=null&&v.kg!==""?` @ ${v.kg} kg`:""}`);
+  return `Gym · Week ${view.week} Day ${view.day} — ${d.t}\n${done.length}/${items.length} exercises done\n\n${lines.join("\n")}\n\nCycle ${cycle} · Runner Gym Log`;
+}
+// FIT activity: training / strength_training, so Strava files it as Weight Training
+function buildFit(start,durSec){
+  const FE=631065600, t0=Math.floor(start.getTime()/1000)-FE, t1=t0+durSec, ms=durSec*1000;
+  const tz=-start.getTimezoneOffset()*60;
+  const out=[]; const u8=v=>out.push(v&255), u16=v=>{u8(v);u8(v>>8)}, u32=v=>{u8(v);u8(v>>8);u8(v>>16);u8(v>>24)};
+  const W={0x00:u8,0x84:u16,0x86:u32,0x8C:u32};
+  const defs={}; let next=0;
+  function msg(global,fields){ // fields: [num,baseType,value]
+    const key=global+":"+fields.map(f=>f[0]).join(",");
+    if(!(key in defs)){ defs[key]=next++; u8(0x40|defs[key]); u8(0); u8(0); u16(global); u8(fields.length);
+      fields.forEach(([n,b])=>{u8(n);u8(b===0x00?1:b===0x84?2:4);u8(b)}); }
+    u8(defs[key]); fields.forEach(([,b,v])=>W[b](v));
+  }
+  msg(0,[[0,0x00,4],[1,0x84,255],[2,0x84,0],[3,0x8C,12345],[4,0x86,t0]]);           // file_id
+  msg(21,[[253,0x86,t0],[0,0x00,0],[1,0x00,0]]);                                    // event: timer start
+  msg(20,[[253,0x86,t0],[5,0x86,0]]);                                               // record
+  msg(20,[[253,0x86,t1],[5,0x86,0]]);
+  msg(21,[[253,0x86,t1],[0,0x00,0],[1,0x00,4]]);                                    // event: timer stop_all
+  msg(19,[[253,0x86,t1],[2,0x86,t0],[7,0x86,ms],[8,0x86,ms],[0,0x00,9],[1,0x00,1],[25,0x00,10],[39,0x00,20]]); // lap
+  msg(18,[[253,0x86,t1],[2,0x86,t0],[7,0x86,ms],[8,0x86,ms],[0,0x00,8],[1,0x00,1],[5,0x00,10],[6,0x00,20],[25,0x84,0],[26,0x84,1]]); // session
+  msg(34,[[253,0x86,t1],[0,0x86,ms],[1,0x84,1],[2,0x00,0],[3,0x00,26],[4,0x00,1],[5,0x86,t1+tz]]); // activity
+  const T=[0x0000,0xCC01,0xD801,0x1400,0xF001,0x3C00,0x2800,0xE401,0xA001,0x6C00,0x7800,0xB401,0x5000,0x9C01,0x8801,0x4400];
+  const crc=(bytes)=>{let c=0;for(const b of bytes){let t=T[c&15];c=(c>>4)&0xFFF;c^=t^T[b&15];t=T[c&15];c=(c>>4)&0xFFF;c^=t^T[(b>>4)&15];}return c};
+  const h=[14,0x20,0x54,0x08,out.length&255,(out.length>>8)&255,(out.length>>16)&255,(out.length>>24)&255,46,70,73,84];
+  const hc=crc(h); h.push(hc&255,hc>>8);
+  const all=h.concat(out); const fc=crc(all); all.push(fc&255,fc>>8);
+  return new Uint8Array(all);
+}
+const STANDALONE = !(window.claude && typeof window.claude.use==="function");
+document.addEventListener("input",e=>{ if(e.target.id==="svStart"||e.target.id==="svDur") $("svStart").dataset.touched="1"; });
+document.addEventListener("click",e=>{
+  if(e.target.id==="svCopy"){
+    const txt=stravaText(), ta=$("svText");
+    const fallback=()=>{ ta.hidden=false; ta.value=txt; ta.focus(); ta.select(); toast("Select all and copy"); };
+    try{ navigator.clipboard.writeText(txt).then(()=>toast("Copied — paste it into Strava"),fallback); }catch(_){ fallback(); }
+  }
+  if(e.target.id==="svFit"){
+    const start=new Date($("svStart").value), mins=parseInt($("svDur").value,10);
+    if(isNaN(start)||!(mins>0)){ toast("Set a start time and minutes first"); return; }
+    const blob=new Blob([buildFit(start,mins*60)],{type:"application/octet-stream"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download=`gym-w${view.week}-${view.day}-${$("svStart").value.slice(0,10)}.fit`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  }
+});
+
+let toastT; function toast(m){ $("toast").textContent=m; $("toast").hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>$("toast").hidden=true,2200); }
+
+// ---------- boot ----------
+render();
+if(window.claude && typeof window.claude.use==="function"){
+  window.claude.use("db").then(d=>{
+    if(!d) return; db=d; render();
+    db.collection("logs").onSnapshot(s=>{ const next={}; s.docs.forEach(x=>next[x.id]=x.data()); for(const id in timers){ if(logs[id]) next[id]=logs[id]; } logs=next; ls.set("gl.logs",logs); refresh(); }, err);
+    db.collection("body").onSnapshot(s=>{ body={}; s.docs.forEach(x=>body[x.id]=x.data()); ls.set("gl.body",body); if(view.day==="BW" && !document.activeElement.closest?.("#bwForm")) renderBody(); }, err);
+    db.doc("settings/state").onSnapshot(s=>{ const c=s.exists?(s.data().cycle||1):1; if(c!==cycle){cycle=c; ls.set("gl.cycle",cycle); render();} }, err);
+  }).catch(()=>{});
+}
+</script>
+
+</body>
+</html>
